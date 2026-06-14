@@ -2,7 +2,10 @@ import { buildSystemPrompt, ART_DIRECTIONS } from './skill.js';
 
 const STORAGE_KEY = 'slidepro.apiKey';
 const MODEL_KEY = 'slidepro.model';
+const GEMINI_KEY = 'slidepro.geminiKey';
+const GEMINI_MODEL_KEY = 'slidepro.geminiModel';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-image-preview';
 
 const els = {
   textInput: document.getElementById('text-input'),
@@ -20,29 +23,39 @@ const els = {
   settingsClose: document.getElementById('settings-close'),
   apiKeyInput: document.getElementById('api-key-input'),
   modelSelect: document.getElementById('model-select'),
+  geminiKeyInput: document.getElementById('gemini-key-input'),
+  geminiModelSelect: document.getElementById('gemini-model-select'),
   saveSettings: document.getElementById('save-settings'),
   apiStatus: document.getElementById('api-status'),
+  geminiStatus: document.getElementById('gemini-status'),
 };
 
 let currentImage = null;
 
-function getApiKey() {
-  return localStorage.getItem(STORAGE_KEY) || '';
-}
-
-function getModel() {
-  return localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
-}
+const getApiKey = () => localStorage.getItem(STORAGE_KEY) || '';
+const getModel = () => localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
+const getGeminiKey = () => localStorage.getItem(GEMINI_KEY) || '';
+const getGeminiModel = () => localStorage.getItem(GEMINI_MODEL_KEY) || DEFAULT_GEMINI_MODEL;
 
 function updateApiStatus() {
-  const key = getApiKey();
-  if (key) {
-    els.apiStatus.textContent = `เชื่อมต่อแล้ว · ${getModel()}`;
+  if (getApiKey()) {
+    els.apiStatus.textContent = `Claude · ${getModel()}`;
     els.apiStatus.className = 'api-status ok';
   } else {
-    els.apiStatus.textContent = 'ยังไม่ได้ตั้งค่า API Key';
+    els.apiStatus.textContent = 'Claude: ยังไม่ตั้งค่า';
     els.apiStatus.className = 'api-status warn';
   }
+  if (getGeminiKey()) {
+    els.geminiStatus.textContent = `Gemini · ${shortenModel(getGeminiModel())}`;
+    els.geminiStatus.className = 'api-status ok';
+  } else {
+    els.geminiStatus.textContent = 'Gemini: ยังไม่ตั้งค่า';
+    els.geminiStatus.className = 'api-status warn';
+  }
+}
+
+function shortenModel(m) {
+  return m.replace('gemini-', 'g-').replace('-preview', '').replace('imagen-', 'imagen-');
 }
 
 function setStatus(msg, type = 'info') {
@@ -54,6 +67,8 @@ function setStatus(msg, type = 'info') {
 function openSettings() {
   els.apiKeyInput.value = getApiKey();
   els.modelSelect.value = getModel();
+  els.geminiKeyInput.value = getGeminiKey();
+  els.geminiModelSelect.value = getGeminiModel();
   els.settingsModal.classList.add('open');
 }
 
@@ -64,12 +79,14 @@ function closeSettings() {
 function saveSettings() {
   const key = els.apiKeyInput.value.trim();
   const model = els.modelSelect.value;
-  if (key) {
-    localStorage.setItem(STORAGE_KEY, key);
-  } else {
-    localStorage.removeItem(STORAGE_KEY);
-  }
+  const gKey = els.geminiKeyInput.value.trim();
+  const gModel = els.geminiModelSelect.value;
+
+  if (key) localStorage.setItem(STORAGE_KEY, key); else localStorage.removeItem(STORAGE_KEY);
+  if (gKey) localStorage.setItem(GEMINI_KEY, gKey); else localStorage.removeItem(GEMINI_KEY);
   localStorage.setItem(MODEL_KEY, model);
+  localStorage.setItem(GEMINI_MODEL_KEY, gModel);
+
   updateApiStatus();
   closeSettings();
   setStatus('บันทึกการตั้งค่าแล้ว', 'success');
@@ -127,9 +144,7 @@ function extractJson(text) {
 
 async function callClaude(userText, imageData) {
   const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error('NO_API_KEY');
-  }
+  if (!apiKey) throw new Error('NO_API_KEY');
 
   const userContent = [];
   if (imageData) {
@@ -173,6 +188,59 @@ async function callClaude(userText, imageData) {
   return extractJson(textBlock.text);
 }
 
+async function callGeminiImage(prompt) {
+  const key = getGeminiKey();
+  if (!key) throw new Error('NO_GEMINI_KEY');
+  const model = getGeminiModel();
+  const isImagen = model.startsWith('imagen-');
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${isImagen ? 'predict' : 'generateContent'}`;
+  const headers = {
+    'content-type': 'application/json',
+    'x-goog-api-key': key,
+  };
+
+  let body;
+  if (isImagen) {
+    body = {
+      instances: [{ prompt }],
+      parameters: { sampleCount: 1, aspectRatio: '16:9' }
+    };
+  } else {
+    body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ['IMAGE'] }
+    };
+  }
+
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    let errBody = '';
+    try { errBody = JSON.stringify(await res.json()); } catch { errBody = await res.text(); }
+    throw new Error(`Gemini API ${res.status}: ${errBody}`);
+  }
+  const data = await res.json();
+
+  if (isImagen) {
+    const pred = (data.predictions || [])[0];
+    const b64 = pred?.bytesBase64Encoded || pred?.image?.imageBytes;
+    const mime = pred?.mimeType || 'image/png';
+    if (!b64) throw new Error('Imagen ไม่ส่งภาพกลับมา: ' + JSON.stringify(data).slice(0, 300));
+    return { mime, data: b64 };
+  }
+
+  const cand = (data.candidates || [])[0];
+  const parts = cand?.content?.parts || [];
+  const imgPart = parts.find(p => p.inlineData?.data || p.inline_data?.data);
+  if (!imgPart) {
+    const textPart = parts.find(p => p.text);
+    const reason = textPart?.text || cand?.finishReason || 'unknown';
+    throw new Error('Gemini ไม่ส่งภาพกลับ — ' + reason);
+  }
+  const inline = imgPart.inlineData || imgPart.inline_data;
+  return { mime: inline.mimeType || inline.mime_type || 'image/png', data: inline.data };
+}
+
 function renderResults(result) {
   els.briefSummary.innerHTML = `
     <div class="brief-row"><span class="brief-label">หัวข้อ:</span> ${escapeHtml(result.topic || '')}</div>
@@ -199,34 +267,100 @@ function renderResults(result) {
           <h3 class="prompt-title">${escapeHtml(p.name)}</h3>
           <p class="prompt-sub">${escapeHtml(meta.short)}</p>
         </div>
-        <button class="copy-btn" type="button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      </header>
+      <div class="prompt-actions">
+        <button class="action-btn copy-btn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           <span class="copy-label">Copy prompt</span>
         </button>
-      </header>
+        <button class="action-btn gen-btn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 7L23 12l-7.5 2.5L13 22l-2.5-7.5L3 12l7.5-2z"></path></svg>
+          <span class="gen-label">Generate Image</span>
+        </button>
+      </div>
+      <div class="image-area" style="display:none;"></div>
       <pre class="prompt-body">${escapeHtml(p.prompt)}</pre>
     `;
-    const btn = card.querySelector('.copy-btn');
-    btn.addEventListener('click', async () => {
+
+    const copyBtn = card.querySelector('.copy-btn');
+    copyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(p.prompt);
-        const label = btn.querySelector('.copy-label');
+        const label = copyBtn.querySelector('.copy-label');
         const orig = label.textContent;
-        btn.classList.add('copied');
+        copyBtn.classList.add('copied');
         label.textContent = 'คัดลอกแล้ว!';
         setTimeout(() => {
-          btn.classList.remove('copied');
+          copyBtn.classList.remove('copied');
           label.textContent = orig;
         }, 1500);
       } catch (e) {
         setStatus('คัดลอกไม่สำเร็จ: ' + e.message, 'error');
       }
     });
+
+    const genBtn = card.querySelector('.gen-btn');
+    const imageArea = card.querySelector('.image-area');
+    genBtn.addEventListener('click', () => handleGenerateImage(p, genBtn, imageArea));
+
     els.resultsGrid.appendChild(card);
   });
 
   els.resultsSection.style.display = 'block';
   els.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function handleGenerateImage(promptObj, btn, imageArea) {
+  if (!getGeminiKey()) {
+    setStatus('⚠ ยังไม่ได้ตั้งค่า Gemini API Key — กดปุ่ม Settings มุมขวาบน', 'error');
+    openSettings();
+    return;
+  }
+  const label = btn.querySelector('.gen-label');
+  const origLabel = label.textContent;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  label.textContent = 'กำลังสร้างภาพ...';
+
+  imageArea.style.display = 'block';
+  imageArea.innerHTML = `<div class="image-loading"><div class="spinner"></div><span>กำลัง gen ภาพจาก ${escapeHtml(getGeminiModel())}... (10-40 วินาที)</span></div>`;
+
+  try {
+    const img = await callGeminiImage(promptObj.prompt);
+    const dataUrl = `data:${img.mime};base64,${img.data}`;
+    const filename = `slidepro-${promptObj.id}-${promptObj.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`;
+    imageArea.innerHTML = `
+      <img class="gen-image" src="${dataUrl}" alt="${escapeHtml(promptObj.name)}">
+      <div class="image-actions">
+        <a class="action-btn" href="${dataUrl}" download="${filename}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download
+        </a>
+        <button class="action-btn regen-btn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          Regenerate
+        </button>
+        <a class="action-btn" href="${dataUrl}" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          Open
+        </a>
+      </div>
+    `;
+    imageArea.querySelector('.regen-btn').addEventListener('click', () => handleGenerateImage(promptObj, btn, imageArea));
+    label.textContent = 'Generated';
+  } catch (e) {
+    if (e.message === 'NO_GEMINI_KEY') {
+      setStatus('⚠ ยังไม่ได้ตั้งค่า Gemini API Key', 'error');
+      openSettings();
+    } else {
+      setStatus('Gen ภาพไม่สำเร็จ: ' + e.message, 'error');
+    }
+    imageArea.innerHTML = `<div class="image-error">เกิดข้อผิดพลาด: ${escapeHtml(e.message)}</div>`;
+    label.textContent = origLabel;
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
 }
 
 function escapeHtml(str) {
@@ -257,7 +391,8 @@ async function onGenerate() {
     if (!result.prompts || !Array.isArray(result.prompts) || result.prompts.length === 0) {
       throw new Error('ไม่ได้รับ prompts จาก Claude');
     }
-    setStatus(`สำเร็จ! ได้ ${result.prompts.length} prompts — กดปุ่ม Copy prompt แล้วนำไปวางใน Gemini`, 'success');
+    const geminiNote = getGeminiKey() ? ' กดปุ่ม Generate Image บนการ์ดเพื่อ gen ภาพได้เลย' : ' (ตั้ง Gemini API key ใน Settings เพื่อ gen ภาพได้)';
+    setStatus(`สำเร็จ! ได้ ${result.prompts.length} prompts —${geminiNote}`, 'success');
     renderResults(result);
   } catch (e) {
     if (e.message === 'NO_API_KEY') {
@@ -285,5 +420,5 @@ els.generateBtn.addEventListener('click', onGenerate);
 
 updateApiStatus();
 if (!getApiKey()) {
-  setStatus('ยินดีต้อนรับ! ก่อนใช้งานครั้งแรก กดปุ่ม Settings มุมขวาบนเพื่อใส่ Claude API Key', 'info');
+  setStatus('ยินดีต้อนรับ! ก่อนใช้งานครั้งแรก กดปุ่ม Settings มุมขวาบนเพื่อใส่ Claude API Key (และ Gemini API Key ถ้าจะ gen ภาพ)', 'info');
 }

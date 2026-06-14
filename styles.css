@@ -331,7 +331,13 @@ textarea:focus { outline: none; border-color: var(--accent); }
   margin: 2px 0 0;
 }
 
-.copy-btn {
+.prompt-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -343,11 +349,83 @@ textarea:focus { outline: none; border-color: var(--accent); }
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  flex-shrink: 0;
   transition: all 0.15s;
+  text-decoration: none;
+  font-family: inherit;
 }
-.copy-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
-.copy-btn.copied { background: var(--success); border-color: var(--success); color: #fff; }
+.action-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.action-btn.copied { background: var(--success); border-color: var(--success); color: #fff; }
+.action-btn.gen-btn {
+  background: linear-gradient(135deg, rgba(0,145,255,0.15), rgba(0,212,255,0.1));
+  border-color: rgba(0,145,255,0.4);
+  color: var(--accent-2);
+}
+.action-btn.gen-btn:hover:not(:disabled) {
+  background: var(--accent-grad);
+  border-color: var(--accent);
+  color: #fff;
+}
+.action-btn.loading {
+  position: relative;
+  color: transparent !important;
+}
+.action-btn.loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: var(--accent-2);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.image-area {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.gen-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+.image-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.image-actions .action-btn { padding: 6px 12px; font-size: 12px; }
+.image-loading {
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.image-error {
+  padding: 18px;
+  color: var(--error);
+  font-size: 13px;
+  background: rgba(255,84,112,0.05);
+}
 
 .prompt-body {
   font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
