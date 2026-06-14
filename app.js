@@ -52,11 +52,15 @@ const els = {
   lightboxCopyLabel: document.getElementById('lightbox-copy-label'),
   lightboxRegen: document.getElementById('lightbox-regen'),
   lightboxDownload: document.getElementById('lightbox-download'),
+  toolbarModelSelect: document.getElementById('toolbar-model-select'),
+  regenAllBtn: document.getElementById('regen-all-btn'),
+  regenAllLabel: document.querySelector('.regen-all-label'),
 };
 
 let currentImage = null;
 let cardStates = [];
 let activeLightboxIdx = null;
+let isQueueRunning = false;
 
 const getApiKey = () => localStorage.getItem(STORAGE_KEY) || '';
 const getModel = () => localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
@@ -70,6 +74,17 @@ function getGeminiModel() {
     return migrated;
   }
   return stored;
+}
+
+function setGeminiModel(model) {
+  localStorage.setItem(GEMINI_MODEL_KEY, model);
+  updateApiStatus();
+  if (els.toolbarModelSelect && els.toolbarModelSelect.value !== model) {
+    els.toolbarModelSelect.value = model;
+  }
+  if (els.geminiModelSelect && els.geminiModelSelect.value !== model) {
+    els.geminiModelSelect.value = model;
+  }
 }
 
 function updateApiStatus() {
@@ -87,6 +102,13 @@ function updateApiStatus() {
     els.geminiStatus.textContent = 'Gemini: ยังไม่ตั้งค่า';
     els.geminiStatus.className = 'api-status warn';
   }
+}
+
+function updateRegenAllBtn() {
+  if (!els.regenAllBtn) return;
+  const hasCards = cardStates.length > 0;
+  els.regenAllBtn.disabled = isQueueRunning || !hasCards;
+  els.regenAllLabel.textContent = isQueueRunning ? 'กำลังสร้าง...' : 'Generate รูปใหม่ทั้งหมด';
 }
 
 function shortenModel(m) {
@@ -139,9 +161,7 @@ function saveSettings() {
   if (key) localStorage.setItem(STORAGE_KEY, key); else localStorage.removeItem(STORAGE_KEY);
   if (gKey) localStorage.setItem(GEMINI_KEY, gKey); else localStorage.removeItem(GEMINI_KEY);
   localStorage.setItem(MODEL_KEY, model);
-  localStorage.setItem(GEMINI_MODEL_KEY, gModel);
-
-  updateApiStatus();
+  setGeminiModel(gModel);
   closeSettings();
   setStatus('บันทึกการตั้งค่าแล้ว', 'success');
   setTimeout(() => setStatus(''), 2000);
@@ -402,6 +422,7 @@ function renderGrid() {
 }
 
 async function runImageQueue() {
+  if (isQueueRunning) return;
   if (!getGeminiKey()) {
     cardStates.forEach(s => { if (s.status !== 'done') s.status = 'no-key'; });
     renderGrid();
@@ -414,60 +435,90 @@ async function runImageQueue() {
     return;
   }
 
-  const pending = cardStates
-    .map((s, i) => ({ s, i }))
-    .filter(({ s }) => s.status !== 'done');
+  isQueueRunning = true;
+  updateRegenAllBtn();
 
-  pending.forEach(({ i }) => cardStates[i].status = 'queued');
-  renderGrid();
+  try {
+    const pending = cardStates
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => s.status !== 'done');
 
-  let done = cardStates.filter(s => s.status === 'done').length;
-  let failed = 0;
-  const total = cardStates.length;
-
-  for (let k = 0; k < pending.length; k++) {
-    const idx = pending[k].i;
-    const state = cardStates[idx];
-    state.status = 'generating';
-    state.error = null;
+    pending.forEach(({ i }) => cardStates[i].status = 'queued');
     renderGrid();
 
-    const current = done + failed + 1;
-    showProgress(`กำลังสร้างภาพใน Gemini · ${state.name}`, {
-      count: `${current}/${total}`,
-      detail: `โมเดล ${getGeminiModel()} · ภาพอาจใช้เวลา 10–40 วินาทีต่อรูป`,
-      percent: (current - 1) / total * 100,
-      tone: 'active',
-    });
+    let done = cardStates.filter(s => s.status === 'done').length;
+    let failed = 0;
+    const total = cardStates.length;
 
-    try {
-      const img = await callGeminiImage(state.prompt);
-      state.status = 'done';
-      state.image = img;
-      done++;
-    } catch (e) {
-      state.status = 'error';
-      state.error = e.message;
-      failed++;
+    for (let k = 0; k < pending.length; k++) {
+      const idx = pending[k].i;
+      const state = cardStates[idx];
+      state.status = 'generating';
+      state.error = null;
+      renderGrid();
+
+      const current = done + failed + 1;
+      showProgress(`กำลังสร้างภาพใน Gemini · ${state.name}`, {
+        count: `${current}/${total}`,
+        detail: `โมเดล ${getGeminiModel()} · ภาพอาจใช้เวลา 10–40 วินาทีต่อรูป`,
+        percent: (current - 1) / total * 100,
+        tone: 'active',
+      });
+
+      try {
+        const img = await callGeminiImage(state.prompt);
+        state.status = 'done';
+        state.image = img;
+        done++;
+      } catch (e) {
+        state.status = 'error';
+        state.error = e.message;
+        failed++;
+      }
+      renderGrid();
     }
-    renderGrid();
-  }
 
-  if (failed === 0) {
-    showProgress('เสร็จสิ้น', {
-      count: `${done}/${total}`,
-      detail: `สร้างภาพสำเร็จทั้ง ${done} รูป — คลิกที่ภาพเพื่อดูเต็มและ copy prompt`,
-      percent: 100,
-      tone: 'success',
-    });
-  } else {
-    showProgress('เสร็จสิ้น (มีบางรูปที่ผิดพลาด)', {
-      count: `${done}/${total}`,
-      detail: `สำเร็จ ${done} รูป · ผิดพลาด ${failed} รูป — กดปุ่ม "ลองอีกครั้ง" บนการ์ดที่ error`,
-      percent: 100,
-      tone: 'warn',
-    });
+    if (failed === 0) {
+      showProgress('เสร็จสิ้น', {
+        count: `${done}/${total}`,
+        detail: `สร้างภาพสำเร็จทั้ง ${done} รูป (โมเดล ${getGeminiModel()}) — คลิกที่ภาพเพื่อดูเต็มและ copy prompt`,
+        percent: 100,
+        tone: 'success',
+      });
+    } else {
+      showProgress('เสร็จสิ้น (มีบางรูปที่ผิดพลาด)', {
+        count: `${done}/${total}`,
+        detail: `สำเร็จ ${done} รูป · ผิดพลาด ${failed} รูป — กดปุ่ม "ลองอีกครั้ง" บนการ์ดที่ error`,
+        percent: 100,
+        tone: 'warn',
+      });
+    }
+  } finally {
+    isQueueRunning = false;
+    updateRegenAllBtn();
   }
+}
+
+async function regenerateAllImages() {
+  if (isQueueRunning || !cardStates.length) return;
+  if (!getGeminiKey()) {
+    setStatus('⚠ ยังไม่ตั้งค่า Gemini API Key — กดปุ่ม Settings มุมขวาบน', 'error');
+    openSettings();
+    return;
+  }
+  cardStates.forEach(s => {
+    s.status = 'queued';
+    s.image = null;
+    s.error = null;
+  });
+  renderGrid();
+  showProgress(`กำลัง regenerate ภาพทั้งหมดด้วย ${getGeminiModel()}`, {
+    count: `0/${cardStates.length}`,
+    detail: 'ใช้ prompts ชุดเดิมจาก Claude — ไม่ต้องเรียก Claude ใหม่',
+    percent: 0,
+    tone: 'active',
+  });
+  await runImageQueue();
 }
 
 async function retryOne(idx) {
@@ -642,6 +693,8 @@ els.settingsModal.addEventListener('click', (e) => {
 els.fileInput.addEventListener('change', handleImageChange);
 els.removeImage.addEventListener('click', removeImage);
 els.generateBtn.addEventListener('click', onGenerate);
+els.toolbarModelSelect.addEventListener('change', (e) => setGeminiModel(e.target.value));
+els.regenAllBtn.addEventListener('click', regenerateAllImages);
 els.textInput.addEventListener('input', autoResizeTextarea);
 els.textInput.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -664,6 +717,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 updateApiStatus();
+els.toolbarModelSelect.value = getGeminiModel();
+updateRegenAllBtn();
 if (!getApiKey()) {
   setStatus('ยินดีต้อนรับ! กดปุ่ม Settings มุมขวาบนเพื่อใส่ Claude API Key + Gemini API Key', 'info');
 }
