@@ -18,12 +18,16 @@
 ต้องเปิดผ่าน HTTP server (ES module ใช้ `file://` ไม่ได้)
 
 ```bash
-cd app
+# วิธี 1: npm
+npm install && npm start
+# เปิด http://localhost:3000
+
+# วิธี 2: python ก็ได้
 python3 -m http.server 8000
 # เปิด http://localhost:8000
 ```
 
-หรือใช้ static host เช่น GitHub Pages, Netlify, Vercel ก็ได้ — มีแค่ HTML/CSS/JS ไม่ต้อง build
+Deploy: Railway / Render / Vercel / Netlify / GitHub Pages ได้ทั้งหมด — มี `package.json` กับ `serve` ให้ Railway/Render detect Node service อัตโนมัติ
 
 ## ตั้งค่าก่อนใช้ครั้งแรก
 
@@ -35,11 +39,11 @@ python3 -m http.server 8000
 ## โครงสร้าง
 
 ```
-app/
 ├── index.html      # UI
 ├── styles.css      # Dark theme (Data-First Blue)
 ├── app.js          # เรียก Claude API + จัดการ UI
-└── skill.js        # ฝัง SKILL.md + รายการ art directions
+├── skill.js        # ฝัง SKILL.md + รายการ art directions
+└── package.json    # static server (serve)
 ```
 
 ## หมายเหตุด้านความปลอดภัย
