@@ -272,11 +272,28 @@ async function callGeminiImage(prompt) {
   } else {
     body = {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ['IMAGE'] }
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        responseFormat: { image: { aspectRatio: '16:9', imageSize: '2K' } }
+      }
     };
   }
 
-  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  let res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+
+  if (!res.ok && !isImagen && res.status === 400) {
+    const errText = await res.text();
+    if (/responseFormat|imageConfig|generation_config/i.test(errText)) {
+      body = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ['IMAGE'] }
+      };
+      res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    } else {
+      throw new Error(`Gemini API ${res.status}: ${errText}`);
+    }
+  }
+
   if (!res.ok) {
     let errBody = '';
     try { errBody = JSON.stringify(await res.json()); } catch { errBody = await res.text(); }
