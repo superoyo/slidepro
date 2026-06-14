@@ -52,16 +52,50 @@
       </div>
 
       <div id="status-bar" class="status-bar"></div>
+
+      <div id="progress" class="progress" style="display:none;">
+        <div class="progress-head">
+          <span id="progress-stage" class="progress-stage">เตรียมเริ่มต้น</span>
+          <span id="progress-count" class="progress-count"></span>
+        </div>
+        <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+        <div id="progress-detail" class="progress-detail"></div>
+      </div>
     </section>
 
     <section id="results-section" class="results-section">
       <h2>โครงสไลด์</h2>
       <div id="brief-summary" class="brief-summary"></div>
 
-      <h2>Prompts ทั้ง 10 รูปแบบ</h2>
+      <h2>ภาพทั้ง 10 รูปแบบ</h2>
       <div id="results-grid" class="results-grid"></div>
     </section>
   </main>
+
+  <div id="lightbox" class="lightbox">
+    <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
+    <div class="lightbox-content">
+      <div class="lightbox-image-side">
+        <img id="lightbox-image" alt="">
+      </div>
+      <aside class="lightbox-prompt-side">
+        <header class="lightbox-header">
+          <span id="lightbox-badge" class="card-badge"></span>
+          <div>
+            <h2 id="lightbox-title"></h2>
+            <p id="lightbox-sub"></p>
+          </div>
+        </header>
+        <div class="lightbox-actions">
+          <button id="lightbox-copy" class="action-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span id="lightbox-copy-label">Copy prompt</span></button>
+          <button id="lightbox-regen" class="action-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>Regenerate</button>
+          <a id="lightbox-download" class="action-btn" download><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Download</a>
+        </div>
+        <div class="lightbox-section-label">Prompt ที่ใช้ generate</div>
+        <pre id="lightbox-prompt" class="lightbox-prompt"></pre>
+      </aside>
+    </div>
+  </div>
 
   <div id="settings-modal" class="modal">
     <div class="modal-content">
@@ -95,7 +129,7 @@
         <label for="gemini-key-input">Gemini API Key (สำหรับ Generate Image)</label>
         <input type="password" id="gemini-key-input" placeholder="AIzaSy..." autocomplete="off">
         <div class="form-hint">
-          ใช้สำหรับเรียก Gemini image-gen เมื่อกดปุ่ม "Generate Image" บนการ์ด<br>
+          ใช้ generate ภาพอัตโนมัติทั้ง 10 รูปหลัง Claude สร้าง prompt เสร็จ<br>
           สร้าง key ได้ที่ <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (ฟรี)
         </div>
       </div>
