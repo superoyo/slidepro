@@ -209,8 +209,7 @@ async function callGeminiImage(prompt) {
   const model = getGeminiModel();
   const isImagen = model.startsWith('imagen-');
 
-  const apiVersion = isImagen ? 'v1beta' : 'v1';
-  const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:${isImagen ? 'predict' : 'generateContent'}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${isImagen ? 'predict' : 'generateContent'}`;
   const headers = {
     'content-type': 'application/json',
     'x-goog-api-key': key,
@@ -225,10 +224,7 @@ async function callGeminiImage(prompt) {
   } else {
     body = {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseModalities: ['TEXT', 'IMAGE'],
-        responseFormat: { image: { aspectRatio: '16:9', imageSize: '2K' } }
-      }
+      generationConfig: { responseModalities: ['IMAGE'] }
     };
   }
 
