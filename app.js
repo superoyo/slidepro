@@ -16,7 +16,9 @@ const GEMINI_MODEL_MIGRATIONS = {
 const els = {
   textInput: document.getElementById('text-input'),
   fileInput: document.getElementById('file-input'),
-  fileLabel: document.getElementById('file-label'),
+  uploadBtn: document.getElementById('upload-btn'),
+  imageChip: document.getElementById('image-chip'),
+  imageChipName: document.getElementById('image-chip-name'),
   imagePreview: document.getElementById('image-preview'),
   removeImage: document.getElementById('remove-image'),
   generateBtn: document.getElementById('generate-btn'),
@@ -172,20 +174,26 @@ function handleImageChange(e) {
   reader.onload = (ev) => {
     currentImage = { file, dataUrl: ev.target.result };
     els.imagePreview.src = ev.target.result;
-    els.imagePreview.style.display = 'block';
-    els.removeImage.style.display = 'inline-block';
-    els.fileLabel.textContent = file.name;
+    els.imageChipName.textContent = file.name;
+    els.imageChip.classList.add('visible');
+    els.uploadBtn.classList.add('has-image');
   };
   reader.readAsDataURL(file);
 }
 
-function removeImage() {
+function removeImage(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
   currentImage = null;
   els.fileInput.value = '';
-  els.imagePreview.style.display = 'none';
   els.imagePreview.src = '';
-  els.removeImage.style.display = 'none';
-  els.fileLabel.textContent = 'แนบรูปภาพ (ไม่บังคับ)';
+  els.imageChip.classList.remove('visible');
+  els.uploadBtn.classList.remove('has-image');
+}
+
+function autoResizeTextarea() {
+  els.textInput.style.height = 'auto';
+  const next = Math.min(els.textInput.scrollHeight, 200);
+  els.textInput.style.height = next + 'px';
 }
 
 function extractJson(text) {
@@ -617,6 +625,13 @@ els.settingsModal.addEventListener('click', (e) => {
 els.fileInput.addEventListener('change', handleImageChange);
 els.removeImage.addEventListener('click', removeImage);
 els.generateBtn.addEventListener('click', onGenerate);
+els.textInput.addEventListener('input', autoResizeTextarea);
+els.textInput.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    onGenerate();
+  }
+});
 
 els.lightboxClose.addEventListener('click', closeLightbox);
 els.lightbox.addEventListener('click', (e) => {

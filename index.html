@@ -29,26 +29,27 @@
 
   <main class="container">
     <section class="hero">
-      <h1>สร้าง prompt Gemini สำหรับสไลด์ 1 หน้า</h1>
-      <p>ใส่หัวข้อหรือแนบรูปภาพ → AI ค้นข้อมูลและสร้าง prompt 10 ทิศทางศิลป์ พร้อมคัดลอกไปใช้กับ Gemini / Nano Banana / Imagen ทันที</p>
+      <h1>สร้างสไลด์สวย ๆ ใน 1 หน้า</h1>
+      <p>พิมพ์หัวข้อหรือแนบรูปภาพ → AI สรุปเป็นโครงสไลด์ + สร้างภาพ 10 สไตล์ให้เลือก</p>
     </section>
 
-    <section class="input-card">
-      <label class="field-label" for="text-input">หัวข้อสไลด์ (ภาษาไทยหรืออังกฤษ)</label>
-      <textarea id="text-input" placeholder="เช่น  5 ขั้นตอนเตรียมข้อมูลก่อนเทรน AI&#10;หรือ:  สรุปหลัก SOLID ทั้ง 5 ข้อ&#10;หรือ:  รูปแบบการนอนที่ดีสำหรับคนทำงานออฟฟิศ"></textarea>
-
-      <div class="input-row">
-        <label class="file-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span id="file-label">แนบรูปภาพ (ไม่บังคับ)</span>
+    <section class="search-wrap">
+      <div class="search-bar">
+        <label class="upload-icon-btn" id="upload-btn" title="แนบรูปภาพ (ไม่บังคับ)" aria-label="Upload image">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
           <input type="file" id="file-input" accept="image/*">
         </label>
-        <img id="image-preview" alt="preview">
-        <button type="button" id="remove-image" class="remove-img-btn">ลบรูป</button>
-        <button type="button" id="generate-btn" class="primary-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 7L23 12l-7.5 2.5L13 22l-2.5-7.5L3 12l7.5-2z"></path></svg>
-          สร้าง 10 Prompts
+        <textarea id="text-input" class="search-input" rows="1" placeholder="พิมพ์หัวข้อสไลด์... เช่น 5 ขั้นตอนเตรียมข้อมูลก่อนเทรน AI"></textarea>
+        <button type="button" id="generate-btn" class="generate-pill">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 7L23 12l-7.5 2.5L13 22l-2.5-7.5L3 12l7.5-2z"></path></svg>
+          Generate Slide
         </button>
+      </div>
+
+      <div id="image-chip" class="image-chip">
+        <img id="image-preview" alt="preview">
+        <span id="image-chip-name" class="image-chip-name">image.png</span>
+        <button type="button" id="remove-image" class="image-chip-remove" aria-label="Remove image">&times;</button>
       </div>
 
       <div id="status-bar" class="status-bar"></div>
@@ -147,7 +148,7 @@
         <div class="form-hint">Nano Banana (2.5 Flash Image) เร็วและถูก; 3 Pro Image คุณภาพสูงกว่า; Imagen 4 เหมาะกับภาพประกอบล้วน ๆ</div>
       </div>
 
-      <button id="save-settings" class="primary-btn" style="width: 100%; margin: 0; justify-content: center;">บันทึก</button>
+      <button id="save-settings" class="save-btn">บันทึก</button>
     </div>
   </div>
 
