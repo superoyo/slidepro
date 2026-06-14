@@ -1,0 +1,5 @@
+.DS_Store
+.claude/
+skill-extracted/
+node_modules/
+*.log
