@@ -5,7 +5,7 @@ const MODEL_KEY = 'slidepro.model';
 const GEMINI_KEY = 'slidepro.geminiKey';
 const GEMINI_MODEL_KEY = 'slidepro.geminiModel';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-image-preview';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-image';
 
 const els = {
   textInput: document.getElementById('text-input'),
@@ -32,10 +32,25 @@ const els = {
 
 let currentImage = null;
 
+const GEMINI_MODEL_MIGRATIONS = {
+  'gemini-2.5-flash-image-preview': 'gemini-2.5-flash-image',
+  'gemini-2.0-flash-preview-image-generation': 'gemini-2.5-flash-image',
+  'imagen-3.0-generate-002': 'imagen-4.0-generate-001',
+};
+
 const getApiKey = () => localStorage.getItem(STORAGE_KEY) || '';
 const getModel = () => localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
 const getGeminiKey = () => localStorage.getItem(GEMINI_KEY) || '';
-const getGeminiModel = () => localStorage.getItem(GEMINI_MODEL_KEY) || DEFAULT_GEMINI_MODEL;
+function getGeminiModel() {
+  const stored = localStorage.getItem(GEMINI_MODEL_KEY);
+  if (!stored) return DEFAULT_GEMINI_MODEL;
+  if (GEMINI_MODEL_MIGRATIONS[stored]) {
+    const migrated = GEMINI_MODEL_MIGRATIONS[stored];
+    localStorage.setItem(GEMINI_MODEL_KEY, migrated);
+    return migrated;
+  }
+  return stored;
+}
 
 function updateApiStatus() {
   if (getApiKey()) {
@@ -194,7 +209,8 @@ async function callGeminiImage(prompt) {
   const model = getGeminiModel();
   const isImagen = model.startsWith('imagen-');
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${isImagen ? 'predict' : 'generateContent'}`;
+  const apiVersion = isImagen ? 'v1beta' : 'v1';
+  const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:${isImagen ? 'predict' : 'generateContent'}`;
   const headers = {
     'content-type': 'application/json',
     'x-goog-api-key': key,
@@ -209,7 +225,10 @@ async function callGeminiImage(prompt) {
   } else {
     body = {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ['IMAGE'] }
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        responseFormat: { image: { aspectRatio: '16:9', imageSize: '2K' } }
+      }
     };
   }
 
