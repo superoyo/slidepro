@@ -52,6 +52,18 @@
         <button type="button" id="remove-image" class="image-chip-remove" aria-label="Remove image">&times;</button>
       </div>
 
+      <div class="gen-options">
+        <label class="gen-toggle" for="gen-image-toggle">
+          <input type="checkbox" id="gen-image-toggle">
+          <span class="gen-toggle-switch"><span class="gen-toggle-thumb"></span></span>
+          <span class="gen-toggle-text">สร้างภาพด้วย Gemini ทันที</span>
+        </label>
+        <div id="gen-image-warning" class="gen-image-warning">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>มีค่าใช้จ่ายตามจำนวนรูป × ราคาโมเดล (Nano Banana ~$0.039/รูป, Imagen 4 Ultra ~$0.12/รูป × 10 รูป)</span>
+        </div>
+      </div>
+
       <div id="status-bar" class="status-bar"></div>
 
       <div id="progress" class="progress" style="display:none;">
@@ -123,6 +135,31 @@
         <h2>Settings</h2>
         <button id="settings-close" class="modal-close" aria-label="Close">&times;</button>
       </div>
+
+      <div class="api-link-row">
+        <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener" class="api-link claude-link">
+          <div class="api-link-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          </div>
+          <div class="api-link-text">
+            <div class="api-link-title">รับ Claude API Key</div>
+            <div class="api-link-sub">เปิด platform.claude.com</div>
+          </div>
+          <svg class="api-link-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10"/></svg>
+        </a>
+        <a href="https://aistudio.google.com/api-keys?project=gen-lang-client-0985429784" target="_blank" rel="noopener" class="api-link gemini-link">
+          <div class="api-link-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          </div>
+          <div class="api-link-text">
+            <div class="api-link-title">รับ Gemini API Key</div>
+            <div class="api-link-sub">เปิด aistudio.google.com (ฟรี)</div>
+          </div>
+          <svg class="api-link-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10"/></svg>
+        </a>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 4px 0 24px;">
 
       <div class="form-group">
         <label for="api-key-input">Claude API Key</label>

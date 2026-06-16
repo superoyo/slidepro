@@ -4,6 +4,7 @@ const STORAGE_KEY = 'slidepro.apiKey';
 const MODEL_KEY = 'slidepro.model';
 const GEMINI_KEY = 'slidepro.geminiKey';
 const GEMINI_MODEL_KEY = 'slidepro.geminiModel';
+const GEN_IMAGE_KEY = 'slidepro.genImage';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-image';
 
@@ -55,6 +56,8 @@ const els = {
   toolbarModelSelect: document.getElementById('toolbar-model-select'),
   regenAllBtn: document.getElementById('regen-all-btn'),
   regenAllLabel: document.querySelector('.regen-all-label'),
+  genImageToggle: document.getElementById('gen-image-toggle'),
+  genImageWarning: document.getElementById('gen-image-warning'),
 };
 
 let currentImage = null;
@@ -65,6 +68,11 @@ let isQueueRunning = false;
 const getApiKey = () => localStorage.getItem(STORAGE_KEY) || '';
 const getModel = () => localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
 const getGeminiKey = () => localStorage.getItem(GEMINI_KEY) || '';
+const getGenImageEnabled = () => localStorage.getItem(GEN_IMAGE_KEY) === '1';
+const setGenImageEnabled = (on) => {
+  if (on) localStorage.setItem(GEN_IMAGE_KEY, '1');
+  else localStorage.removeItem(GEN_IMAGE_KEY);
+};
 function getGeminiModel() {
   const stored = localStorage.getItem(GEMINI_MODEL_KEY);
   if (!stored) return DEFAULT_GEMINI_MODEL;
@@ -109,6 +117,12 @@ function updateRegenAllBtn() {
   const hasCards = cardStates.length > 0;
   els.regenAllBtn.disabled = isQueueRunning || !hasCards;
   els.regenAllLabel.textContent = isQueueRunning ? 'กำลังสร้าง...' : 'Generate รูปใหม่ทั้งหมด';
+}
+
+function updateGenImageUI() {
+  const on = els.genImageToggle.checked;
+  els.genImageWarning.classList.toggle('visible', on);
+  setGenImageEnabled(on);
 }
 
 function shortenModel(m) {
@@ -363,7 +377,14 @@ function renderGrid() {
     card.dataset.idx = String(idx);
 
     let visual = '';
-    if (state.status === 'queued') {
+    if (state.status === 'prompt-only') {
+      visual = `
+        <div class="state-overlay prompt-only">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+          <div class="state-text">Prompt พร้อมใช้</div>
+          <div class="state-sub">คลิกเพื่อดูและคัดลอก prompt · กดปุ่ม Generate ด้านบนเพื่อสร้างภาพ</div>
+        </div>`;
+    } else if (state.status === 'queued') {
       visual = `
         <div class="state-overlay queued">
           <div class="queue-pill"><span class="queue-dot"></span>เข้าคิว</div>
@@ -407,7 +428,7 @@ function renderGrid() {
       </div>
     `;
 
-    if (state.status === 'done') {
+    if (state.status === 'done' || state.status === 'prompt-only') {
       card.querySelector('.card-visual').addEventListener('click', () => openLightbox(idx));
     }
     if (state.status === 'error') {
@@ -557,20 +578,44 @@ async function retryOne(idx) {
 
 function openLightbox(idx) {
   const state = cardStates[idx];
-  if (!state || state.status !== 'done') return;
+  if (!state || (state.status !== 'done' && state.status !== 'prompt-only')) return;
   activeLightboxIdx = idx;
   const meta = ART_DIRECTIONS.find(a => a.id === state.id) || { short: '' };
-  const dataUrl = `data:${state.image.mime};base64,${state.image.data}`;
-  els.lightboxImage.src = dataUrl;
-  els.lightboxImage.alt = state.name;
   els.lightboxBadge.textContent = state.id;
   els.lightboxTitle.textContent = state.name;
   els.lightboxSub.textContent = meta.short;
   els.lightboxPrompt.textContent = state.prompt;
-  els.lightboxDownload.href = dataUrl;
-  els.lightboxDownload.download = `slidepro-${state.id}-${state.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`;
   els.lightboxCopyLabel.textContent = 'Copy prompt';
   els.lightboxCopy.classList.remove('copied');
+
+  const side = document.querySelector('.lightbox-image-side');
+  let placeholder = side.querySelector('.lightbox-placeholder');
+
+  if (state.image) {
+    const dataUrl = `data:${state.image.mime};base64,${state.image.data}`;
+    els.lightboxImage.src = dataUrl;
+    els.lightboxImage.alt = state.name;
+    els.lightboxImage.style.display = '';
+    els.lightboxDownload.style.display = '';
+    els.lightboxDownload.href = dataUrl;
+    els.lightboxDownload.download = `slidepro-${state.id}-${state.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`;
+    if (placeholder) placeholder.remove();
+  } else {
+    els.lightboxImage.style.display = 'none';
+    els.lightboxImage.src = '';
+    els.lightboxDownload.style.display = 'none';
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.className = 'lightbox-placeholder';
+      side.appendChild(placeholder);
+    }
+    placeholder.innerHTML = `
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <div class="placeholder-title">ยังไม่ได้สร้างภาพ</div>
+      <div class="placeholder-sub">คัดลอก prompt ไปวางที่ Gemini เอง<br>หรือกดปุ่ม Regenerate ด้านขวาเพื่อให้ระบบ gen ให้ (ใช้ Gemini API key + มีค่าใช้จ่าย)</div>
+    `;
+  }
+
   els.lightbox.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -644,26 +689,37 @@ async function onGenerate() {
     renderBrief(result);
     els.resultsSection.style.display = 'block';
 
+    const willGenImage = els.genImageToggle.checked;
+
     cardStates = result.prompts.map(p => ({
       id: p.id,
       name: p.name,
       prompt: p.prompt,
-      status: 'queued',
+      status: willGenImage ? 'queued' : 'prompt-only',
       image: null,
       error: null,
     }));
     renderGrid();
-
-    showProgress('ขั้นตอนที่ 2/2 · กำลังสร้างภาพใน Gemini', {
-      count: `0/${cardStates.length}`,
-      detail: 'จะ generate ทีละรูปเรียงตามลำดับ',
-      percent: 0,
-      tone: 'active',
-    });
+    updateRegenAllBtn();
 
     els.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    await runImageQueue();
+    if (willGenImage) {
+      showProgress('ขั้นตอนที่ 2/2 · กำลังสร้างภาพใน Gemini', {
+        count: `0/${cardStates.length}`,
+        detail: 'จะ generate ทีละรูปเรียงตามลำดับ',
+        percent: 0,
+        tone: 'active',
+      });
+      await runImageQueue();
+    } else {
+      showProgress('เสร็จสิ้น — Prompt 10 อันพร้อมใช้', {
+        count: `${cardStates.length}/${cardStates.length}`,
+        detail: 'คลิกที่การ์ดเพื่อดูและคัดลอก prompt · กดปุ่ม Generate รูปใหม่ด้านบนถ้าต้องการให้ระบบ gen ภาพให้',
+        percent: 100,
+        tone: 'success',
+      });
+    }
   } catch (e) {
     if (e.message === 'NO_API_KEY') {
       setStatus('⚠ ยังไม่ได้ตั้งค่า Claude API Key', 'error');
@@ -695,6 +751,7 @@ els.removeImage.addEventListener('click', removeImage);
 els.generateBtn.addEventListener('click', onGenerate);
 els.toolbarModelSelect.addEventListener('change', (e) => setGeminiModel(e.target.value));
 els.regenAllBtn.addEventListener('click', regenerateAllImages);
+els.genImageToggle.addEventListener('change', updateGenImageUI);
 els.textInput.addEventListener('input', autoResizeTextarea);
 els.textInput.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -718,6 +775,8 @@ document.addEventListener('keydown', (e) => {
 
 updateApiStatus();
 els.toolbarModelSelect.value = getGeminiModel();
+els.genImageToggle.checked = getGenImageEnabled();
+updateGenImageUI();
 updateRegenAllBtn();
 if (!getApiKey()) {
   setStatus('ยินดีต้อนรับ! กดปุ่ม Settings มุมขวาบนเพื่อใส่ Claude API Key + Gemini API Key', 'info');
