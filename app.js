@@ -64,7 +64,7 @@ let currentImage = null;
 let cardStates = [];
 let activeLightboxIdx = null;
 let isQueueRunning = false;
-let serverConfig = { hasClaudeEnvKey: false, hasGeminiEnvKey: false };
+let serverConfig = { hasClaudeEnvKey: false, hasGeminiEnvKey: false, claudeEnvName: null, geminiEnvName: null };
 
 async function loadServerConfig() {
   try {
@@ -112,7 +112,7 @@ function setGeminiModel(model) {
 
 function updateApiStatus() {
   if (serverConfig.hasClaudeEnvKey) {
-    els.apiStatus.textContent = `Claude · ใช้ค่าจาก Railway`;
+    els.apiStatus.textContent = `Claude · env ${serverConfig.claudeEnvName || ''}`.trim();
     els.apiStatus.className = 'api-status ok';
   } else if (getApiKey()) {
     els.apiStatus.textContent = `Claude · ${getModel()}`;
@@ -122,7 +122,7 @@ function updateApiStatus() {
     els.apiStatus.className = 'api-status warn';
   }
   if (serverConfig.hasGeminiEnvKey) {
-    els.geminiStatus.textContent = `Gemini · ใช้ค่าจาก Railway`;
+    els.geminiStatus.textContent = `Gemini · env ${serverConfig.geminiEnvName || ''}`.trim();
     els.geminiStatus.className = 'api-status ok';
   } else if (getGeminiKey()) {
     els.geminiStatus.textContent = `Gemini · ${shortenModel(getGeminiModel())}`;
@@ -181,7 +181,10 @@ function openSettings() {
     els.apiKeyInput.value = '';
     els.apiKeyInput.placeholder = '••••••••••••••••  (อ่านจาก Railway env แล้ว)';
     els.apiKeyInput.disabled = true;
-    document.getElementById('claude-env-note').style.display = 'flex';
+    const note = document.getElementById('claude-env-note');
+    note.style.display = 'flex';
+    const codeEl = note.querySelector('code');
+    if (codeEl && serverConfig.claudeEnvName) codeEl.textContent = serverConfig.claudeEnvName;
   } else {
     els.apiKeyInput.value = getApiKey();
     els.apiKeyInput.placeholder = 'sk-ant-api03-...';
@@ -195,7 +198,10 @@ function openSettings() {
     els.geminiKeyInput.value = '';
     els.geminiKeyInput.placeholder = '••••••••••••••••  (อ่านจาก Railway env แล้ว)';
     els.geminiKeyInput.disabled = true;
-    document.getElementById('gemini-env-note').style.display = 'flex';
+    const note = document.getElementById('gemini-env-note');
+    note.style.display = 'flex';
+    const codeEl = note.querySelector('code');
+    if (codeEl && serverConfig.geminiEnvName) codeEl.textContent = serverConfig.geminiEnvName;
   } else {
     els.geminiKeyInput.value = getGeminiKey();
     els.geminiKeyInput.placeholder = 'AIzaSy...';
@@ -832,7 +838,7 @@ loadServerConfig().then(() => {
   if (!hasClaudeAccess()) {
     setStatus('ยินดีต้อนรับ! กดปุ่ม Settings มุมขวาบนเพื่อใส่ Claude API Key (หรือ set CLAUDE_API_KEY ใน Railway env)', 'info');
   } else if (serverConfig.hasClaudeEnvKey) {
-    setStatus('✓ ตรวจพบ Claude API Key จาก Railway env — พร้อมใช้งาน', 'success');
-    setTimeout(() => setStatus(''), 3000);
+    setStatus(`✓ ตรวจพบ Claude API Key จาก Railway env (${serverConfig.claudeEnvName}) — พร้อมใช้งาน`, 'success');
+    setTimeout(() => setStatus(''), 4000);
   }
 });
