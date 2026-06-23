@@ -163,10 +163,14 @@
 
       <div class="form-group">
         <label for="api-key-input">Claude API Key</label>
+        <div id="claude-env-note" class="env-note" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>ตรวจพบ <code>CLAUDE_API_KEY</code> จาก Railway env — ใช้ค่านี้อยู่ ไม่ต้องกรอก</span>
+        </div>
         <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off">
         <div class="form-hint">
-          เก็บไว้ในเบราว์เซอร์ของคุณเท่านั้น (localStorage) — ไม่ส่งไปที่ไหนนอกจาก api.anthropic.com<br>
-          สร้าง key ได้ที่ <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>
+          ถ้ามี Railway env <code>CLAUDE_API_KEY</code> (หรือ <code>ANTHROPIC_API_KEY</code>) จะใช้ค่านั้นโดยอัตโนมัติและ key จะไม่ถูกส่งมาที่เบราว์เซอร์เลย — ปลอดภัยกว่า<br>
+          ถ้าไม่มี env ค่อยกรอกที่นี่ (เก็บใน localStorage ของเบราว์เซอร์เท่านั้น)
         </div>
       </div>
 
@@ -184,10 +188,14 @@
 
       <div class="form-group">
         <label for="gemini-key-input">Gemini API Key (สำหรับ Generate Image)</label>
+        <div id="gemini-env-note" class="env-note" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>ตรวจพบ <code>GEMINI_API_KEY</code> จาก Railway env — ใช้ค่านี้อยู่ ไม่ต้องกรอก</span>
+        </div>
         <input type="password" id="gemini-key-input" placeholder="AIzaSy..." autocomplete="off">
         <div class="form-hint">
-          ใช้ generate ภาพอัตโนมัติทั้ง 10 รูปหลัง Claude สร้าง prompt เสร็จ<br>
-          สร้าง key ได้ที่ <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (ฟรี)
+          ใช้ generate ภาพหลัง Claude สร้าง prompt เสร็จ<br>
+          ถ้ามี Railway env <code>GEMINI_API_KEY</code> (หรือ <code>GOOGLE_API_KEY</code>) จะใช้ค่านั้นโดยอัตโนมัติ
         </div>
       </div>
 

@@ -64,6 +64,21 @@ let currentImage = null;
 let cardStates = [];
 let activeLightboxIdx = null;
 let isQueueRunning = false;
+let serverConfig = { hasClaudeEnvKey: false, hasGeminiEnvKey: false };
+
+async function loadServerConfig() {
+  try {
+    const r = await fetch('/api/config', { cache: 'no-store' });
+    if (r.ok) {
+      serverConfig = await r.json();
+    }
+  } catch (e) {
+    // Static-host fallback (no backend) — leave defaults; user must enter own keys.
+  }
+}
+
+const hasClaudeAccess = () => serverConfig.hasClaudeEnvKey || !!getApiKey();
+const hasGeminiAccess = () => serverConfig.hasGeminiEnvKey || !!getGeminiKey();
 
 const getApiKey = () => localStorage.getItem(STORAGE_KEY) || '';
 const getModel = () => localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL;
@@ -96,14 +111,20 @@ function setGeminiModel(model) {
 }
 
 function updateApiStatus() {
-  if (getApiKey()) {
+  if (serverConfig.hasClaudeEnvKey) {
+    els.apiStatus.textContent = `Claude · ใช้ค่าจาก Railway`;
+    els.apiStatus.className = 'api-status ok';
+  } else if (getApiKey()) {
     els.apiStatus.textContent = `Claude · ${getModel()}`;
     els.apiStatus.className = 'api-status ok';
   } else {
     els.apiStatus.textContent = 'Claude: ยังไม่ตั้งค่า';
     els.apiStatus.className = 'api-status warn';
   }
-  if (getGeminiKey()) {
+  if (serverConfig.hasGeminiEnvKey) {
+    els.geminiStatus.textContent = `Gemini · ใช้ค่าจาก Railway`;
+    els.geminiStatus.className = 'api-status ok';
+  } else if (getGeminiKey()) {
     els.geminiStatus.textContent = `Gemini · ${shortenModel(getGeminiModel())}`;
     els.geminiStatus.className = 'api-status ok';
   } else {
@@ -155,10 +176,34 @@ function hideProgress() {
 }
 
 function openSettings() {
-  els.apiKeyInput.value = getApiKey();
+  // Claude
+  if (serverConfig.hasClaudeEnvKey) {
+    els.apiKeyInput.value = '';
+    els.apiKeyInput.placeholder = '••••••••••••••••  (อ่านจาก Railway env แล้ว)';
+    els.apiKeyInput.disabled = true;
+    document.getElementById('claude-env-note').style.display = 'flex';
+  } else {
+    els.apiKeyInput.value = getApiKey();
+    els.apiKeyInput.placeholder = 'sk-ant-api03-...';
+    els.apiKeyInput.disabled = false;
+    document.getElementById('claude-env-note').style.display = 'none';
+  }
   els.modelSelect.value = getModel();
-  els.geminiKeyInput.value = getGeminiKey();
+
+  // Gemini
+  if (serverConfig.hasGeminiEnvKey) {
+    els.geminiKeyInput.value = '';
+    els.geminiKeyInput.placeholder = '••••••••••••••••  (อ่านจาก Railway env แล้ว)';
+    els.geminiKeyInput.disabled = true;
+    document.getElementById('gemini-env-note').style.display = 'flex';
+  } else {
+    els.geminiKeyInput.value = getGeminiKey();
+    els.geminiKeyInput.placeholder = 'AIzaSy...';
+    els.geminiKeyInput.disabled = false;
+    document.getElementById('gemini-env-note').style.display = 'none';
+  }
   els.geminiModelSelect.value = getGeminiModel();
+
   els.settingsModal.classList.add('open');
 }
 
@@ -240,8 +285,7 @@ function extractJson(text) {
 }
 
 async function callClaude(userText, imageData) {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error('NO_API_KEY');
+  if (!hasClaudeAccess()) throw new Error('NO_API_KEY');
 
   const userContent = [];
   if (imageData) {
@@ -262,14 +306,14 @@ async function callClaude(userText, imageData) {
     messages: [{ role: 'user', content: userContent }]
   };
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const headers = { 'content-type': 'application/json' };
+  if (!serverConfig.hasClaudeEnvKey && getApiKey()) {
+    headers['x-user-claude-key'] = getApiKey();
+  }
+
+  const res = await fetch('/api/claude', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -286,25 +330,23 @@ async function callClaude(userText, imageData) {
 }
 
 async function callGeminiImage(prompt) {
-  const key = getGeminiKey();
-  if (!key) throw new Error('NO_GEMINI_KEY');
+  if (!hasGeminiAccess()) throw new Error('NO_GEMINI_KEY');
   const model = getGeminiModel();
   const isImagen = model.startsWith('imagen-');
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${isImagen ? 'predict' : 'generateContent'}`;
-  const headers = {
-    'content-type': 'application/json',
-    'x-goog-api-key': key,
-  };
+  const headers = { 'content-type': 'application/json' };
+  if (!serverConfig.hasGeminiEnvKey && getGeminiKey()) {
+    headers['x-user-gemini-key'] = getGeminiKey();
+  }
 
-  let body;
+  let payload;
   if (isImagen) {
-    body = {
+    payload = {
       instances: [{ prompt }],
       parameters: { sampleCount: 1, aspectRatio: '16:9' }
     };
   } else {
-    body = {
+    payload = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseModalities: ['TEXT', 'IMAGE'],
@@ -313,16 +355,22 @@ async function callGeminiImage(prompt) {
     };
   }
 
-  let res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  const post = (body) => fetch('/api/gemini-image', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model, isImagen, payload: body }),
+  });
+
+  let res = await post(payload);
 
   if (!res.ok && !isImagen && res.status === 400) {
     const errText = await res.text();
     if (/responseFormat|imageConfig|generation_config/i.test(errText)) {
-      body = {
+      payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseModalities: ['IMAGE'] }
       };
-      res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      res = await post(payload);
     } else {
       throw new Error(`Gemini API ${res.status}: ${errText}`);
     }
@@ -444,7 +492,7 @@ function renderGrid() {
 
 async function runImageQueue() {
   if (isQueueRunning) return;
-  if (!getGeminiKey()) {
+  if (!hasGeminiAccess()) {
     cardStates.forEach(s => { if (s.status !== 'done') s.status = 'no-key'; });
     renderGrid();
     showProgress('ยังไม่ตั้งค่า Gemini API Key', {
@@ -522,7 +570,7 @@ async function runImageQueue() {
 
 async function regenerateAllImages() {
   if (isQueueRunning || !cardStates.length) return;
-  if (!getGeminiKey()) {
+  if (!hasGeminiAccess()) {
     setStatus('⚠ ยังไม่ตั้งค่า Gemini API Key — กดปุ่ม Settings มุมขวาบน', 'error');
     openSettings();
     return;
@@ -544,7 +592,7 @@ async function regenerateAllImages() {
 
 async function retryOne(idx) {
   const state = cardStates[idx];
-  if (!getGeminiKey()) {
+  if (!hasGeminiAccess()) {
     openSettings();
     return;
   }
@@ -662,7 +710,7 @@ async function onGenerate() {
     setStatus('กรุณาใส่หัวข้อ (ข้อความ) หรือแนบรูปภาพอย่างน้อย 1 อย่าง', 'error');
     return;
   }
-  if (!getApiKey()) {
+  if (!hasClaudeAccess()) {
     setStatus('⚠ ยังไม่ได้ตั้งค่า Claude API Key — กดปุ่ม Settings มุมขวาบน', 'error');
     openSettings();
     return;
@@ -773,11 +821,18 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-updateApiStatus();
 els.toolbarModelSelect.value = getGeminiModel();
 els.genImageToggle.checked = getGenImageEnabled();
 updateGenImageUI();
 updateRegenAllBtn();
-if (!getApiKey()) {
-  setStatus('ยินดีต้อนรับ! กดปุ่ม Settings มุมขวาบนเพื่อใส่ Claude API Key + Gemini API Key', 'info');
-}
+updateApiStatus();
+
+loadServerConfig().then(() => {
+  updateApiStatus();
+  if (!hasClaudeAccess()) {
+    setStatus('ยินดีต้อนรับ! กดปุ่ม Settings มุมขวาบนเพื่อใส่ Claude API Key (หรือ set CLAUDE_API_KEY ใน Railway env)', 'info');
+  } else if (serverConfig.hasClaudeEnvKey) {
+    setStatus('✓ ตรวจพบ Claude API Key จาก Railway env — พร้อมใช้งาน', 'success');
+    setTimeout(() => setStatus(''), 3000);
+  }
+});
